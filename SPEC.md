@@ -20,8 +20,9 @@ the phone; removed 2026-11-02, code at the tag `expo-archive`). Its open issues 
   spacing and type value comes from a copy of trismegistus-mac's `design/tokens.json` through a generator into
   Kotlin (as the Mac app does into `Tokens.swift`), so the two apps don't drift.
 - **Usability mapped from the Mac app** (see Surfaces). Its six sections, Chat's kind tabs, the command transcript,
-  images in the composer, approvals with Once / Session / Deny. How the six sections sit on a phone (a bottom bar
-  has room for four or five) is drawn as alternatives in the Penpot draft and decided there.
+  images in the composer, approvals with Once / Session / Deny. **Navigation: a drawer** (design B, chosen
+  2026-11-02): ☰ in the steel top bar or a swipe from the left edge opens the Mac sidebar (the six sections with their
+  marks, relay status, device and settings); the open section gets the full height. Draft: `design/phone-draft/`.
 - **First version: Chat, approvals and notifications** (plus pairing and settings). GitHub, News, Agents, Jobs and
   Commands follow in a later phase.
 - **The phone pairs as a `manager`** (`pair --name s21 --role manager --replace`). Decided by Hermes when Martin
@@ -168,5 +169,4 @@ Phases 0 and 1 can run in parallel.
 
 ## Open
 
-- The navigation pattern for six sections on a phone (decided in phase 0).
 - Whether the Galaxy Tab S8 gets a two-pane layout (later; not in v1).
