@@ -1,0 +1,86 @@
+{
+  "_doc": "Single source of the Endfield look. theme/generate.py renders Ghostty, kitty, GTK, qt6ct, Hyprland colors, the QML Theme singleton and the design exports from this file; nothing else defines a color. Every section has a _doc string. Colors are #rrggbb.",
+  "colors": {
+    "_doc": "Each color: hex plus the one job it does (SPEC 'Colors'). Yellow is a fill with ink on top; yellow text only on ink.",
+    "paper":          { "hex": "#f2f2f2", "role": "desktop and bar background" },
+    "raised":         { "hex": "#ffffff", "role": "raised panel; text on ink blocks" },
+    "sunken":         { "hex": "#e5e5e5", "role": "sunken field, grey value chip" },
+    "rule":           { "hex": "#d9d9d9", "role": "hairline rules and panel edges" },
+    "ink":            { "hex": "#191919", "role": "text and ink blocks" },
+    "darkPanel":      { "hex": "#35373c", "role": "dark strips, lock panel" },
+    "secondary":      { "hex": "#666666", "role": "secondary text" },
+    "muted":          { "hex": "#999999", "role": "muted text, empty states" },
+    "yellow":         { "hex": "#fffa00", "role": "selection, active, progress, primary action" },
+    "blue":           { "hex": "#0040e8", "role": "code tags and data marks (sparingly)" },
+    "green":          { "hex": "#00ffa2", "role": "online / ok / verified only" },
+    "magenta":        { "hex": "#ff1aac", "role": "title rule segment only" },
+    "red":            { "hex": "#e5332a", "role": "errors and failed unlocks only" },
+    "borderInactive": { "hex": "#c8c8c0", "role": "inactive window border" }
+  },
+  "terminal": {
+    "_doc": "ANSI colors for the terminal (Ghostty; kitty on aarch64) on paper. The signal colors are unreadable as text on paper, so normal colors are darkened variants; bright ones use the tokens. Tentative until phase 6.",
+    "foreground": "#191919",
+    "background": "#f2f2f2",
+    "ansi": [
+      "#191919", "#c4271f", "#00875a", "#857d00", "#0040e8", "#c2007f", "#00808a", "#d9d9d9",
+      "#666666", "#e5332a", "#00b371", "#a89e00", "#3366ff", "#ff1aac", "#00a3ad", "#ffffff"
+    ]
+  },
+  "geometry": {
+    "_doc": "Pixels. radius: panels and windows (square). chipRadius: chips, tags, buttons. border: window and focus borders. gap: window gaps and base spacing. hairline: rules.",
+    "radius": 0,
+    "chipRadius": 4,
+    "border": 2,
+    "gap": 8,
+    "barHeight": 40,
+    "hairline": 1
+  },
+  "type": {
+    "_doc": "Five roles. family is the fontconfig family; wdth is the variable width axis (0 = font default); tracking is letter spacing in em. icon is the Nerd Font symbols face every glyph in 'icons' is drawn with. Picked by Martin from the phase 1 gallery on 2026-10-30.",
+    "display": { "family": "Archivo",                 "weight": 700, "wdth": 125, "tracking": -0.02 },
+    "ui":      { "family": "Outfit",                  "weight": 400, "wdth": 0,   "tracking": 0 },
+    "label":   { "family": "Space Grotesk",           "weight": 500, "wdth": 0,   "tracking": 0.08 },
+    "data":    { "family": "JetBrainsMono Nerd Font", "weight": 400, "wdth": 0,   "tracking": 0 },
+    "icon":    { "family": "Symbols Nerd Font Mono",  "weight": 400, "wdth": 0,   "tracking": 0 },
+    "size": {
+      "_doc": "Pixel sizes: micro for field labels, numeral for big readouts.",
+      "micro": 10, "small": 12, "body": 14, "title": 18, "heading": 28, "display": 48, "numeral": 96
+    }
+  },
+  "icons": {
+    "_doc": "Nerd Font glyphs, name -> codepoint (hex). The only place a glyph is named; QML uses Theme.icons.<name> with Theme.font.icon. f000-f2ff is the Font Awesome range, f0001 and up Material Design.",
+    "wifi": "f1eb", "bluetooth": "f293", "volume": "f028", "volumeMute": "f026", "brightness": "f185",
+    "battery": "f240", "cpu": "f2db", "memory": "f035b", "disk": "f0a0", "clock": "f017", "calendar": "f073",
+    "bell": "f0f3", "search": "f002", "terminal": "f120", "folder": "f07b", "power": "f011", "lock": "f023",
+    "close": "f00d", "check": "f00c", "warning": "f071", "chevronRight": "f054"
+  },
+  "motion": {
+    "_doc": "Milliseconds, measured from the game and shortened for the desktop (SPEC 'Motion'). Panels ease out, the band eases in; closing is the faster reverse. reducedMotion zeroes every duration. Easing names are QtQuick Easing types.",
+    "reducedMotion": false,
+    "popupBar": 80,
+    "popupContent": 120,
+    "popupClose": 100,
+    "osdRule": 120,
+    "bandSweep": 430,
+    "bandFadeUp": 300,
+    "window": 200,
+    "workspace": 200,
+    "easePanel": "OutCubic",
+    "easeBand": "InCubic"
+  },
+  "osd": {
+    "_doc": "Volume/brightness OSD: big centered numeral over a thin yellow rule that grows from the center, on a small paper panel at the bottom center (built in phase 2).",
+    "width": 240,
+    "height": 140,
+    "bottomMargin": 96,
+    "numeralSize": 72,
+    "ruleWidth": 160,
+    "ruleHeight": 3
+  },
+  "panelStyles": {
+    "_doc": "Floating panel and window chrome. Martin picked hairline (soft shadow) on 2026-10-30; outline stays defined but unused. edge: border width and color token; shadow: blur radius, offset, color token and opacity. default also sets the Hyprland window shadow.",
+    "default": "hairline",
+    "hairline": { "edgeWidth": 1, "edgeColor": "rule", "shadowBlur": 24, "shadowX": 0, "shadowY": 4, "shadowColor": "ink", "shadowOpacity": 0.12 },
+    "outline":  { "edgeWidth": 2, "edgeColor": "ink",  "shadowBlur": 0,  "shadowX": 4, "shadowY": 4, "shadowColor": "ink", "shadowOpacity": 1.0 }
+  }
+}

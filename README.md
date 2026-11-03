@@ -29,3 +29,11 @@ State outside the repo, in `~/.local/share/trismegistus-android/`:
 `protocol/` is a copy of the relay repo's `protocol/` (schema and examples). `scripts/sync-protocol.sh` refreshes it
 from `~/Projects/trismegistus/protocol` and writes `protocol/SOURCE` (`scripts/protocol-hash.sh`); a contract test
 fails while the copy is stale.
+
+## Design
+
+`design/phone-draft/`: the agreed Penpot draft (#2) and the controls page. `design/tokens.json` and
+`design/endfield-palette.json` are copies (trismegistus-mac's tokens and the Endfield palette they reference),
+refreshed by `scripts/sync-tokens.sh` (hashes in `design/TOKENS_SOURCE`); `design/android-tokens.json` adds the
+phone's type sizes and component sizes; `design/icons.json` holds the draft's 16-unit stroke icons as SVG paths.
+Inter and JetBrains Mono are bundled in `app/src/main/res/font/` (SIL OFL, `licenses/`).

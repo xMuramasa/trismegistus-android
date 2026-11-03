@@ -1,0 +1,43 @@
+{
+  "$description": "Phone-only design values for trismegistus-android, from the agreed Penpot draft (#2, 'Agreed design'). Colours, spacing scale, radius, stroke and opacity come from design/tokens.json (a copy of trismegistus-mac's, synced by scripts/sync-tokens.sh) and its {endfield.*} references from design/endfield-palette.json. This file only adds what differs on a phone: type sizes in sp and component sizes in dp.",
+  "type": {
+    "label":       { "family": "inter",          "weight": 600, "size": 11, "lineHeight": 1.2,  "letterSpacing": 0.9, "caps": true },
+    "label-small": { "family": "inter",          "weight": 600, "size": 10, "lineHeight": 1.2,  "letterSpacing": 0.8, "caps": true },
+    "body":        { "family": "inter",          "weight": 400, "size": 15, "lineHeight": 1.45, "letterSpacing": 0,   "caps": false },
+    "body-strong": { "family": "inter",          "weight": 600, "size": 15, "lineHeight": 1.4,  "letterSpacing": 0,   "caps": false },
+    "title":       { "family": "inter",          "weight": 600, "size": 16, "lineHeight": 1.3,  "letterSpacing": 0,   "caps": false },
+    "heading":     { "family": "inter",          "weight": 700, "size": 19, "lineHeight": 1.2,  "letterSpacing": 0,   "caps": false },
+    "caption":     { "family": "inter",          "weight": 400, "size": 12, "lineHeight": 1.35, "letterSpacing": 0,   "caps": false },
+    "button":      { "family": "inter",          "weight": 700, "size": 13, "lineHeight": 1.2,  "letterSpacing": 0.6, "caps": true },
+    "mono":        { "family": "jetbrains-mono", "weight": 400, "size": 13, "lineHeight": 1.45, "letterSpacing": 0,   "caps": false },
+    "mono-small":  { "family": "jetbrains-mono", "weight": 400, "size": 12, "lineHeight": 1.35, "letterSpacing": 0,   "caps": false },
+    "mono-bold":   { "family": "jetbrains-mono", "weight": 700, "size": 12, "lineHeight": 1.35, "letterSpacing": 0,   "caps": false }
+  },
+  "size": {
+    "app-bar": 56,
+    "touch": 48,
+    "button-height": 44,
+    "field-height": 44,
+    "drawer-width": 316,
+    "drawer-item": 52,
+    "fab": 56,
+    "icon": 22,
+    "icon-small": 14,
+    "icon-tab": 20,
+    "badge-dot": 8,
+    "title-rule": 3,
+    "title-rule-magenta": 56,
+    "title-rule-yellow": 72,
+    "tab-indicator": 2,
+    "selected-outline": 1.5,
+    "thumbnail": 72,
+    "sheet-handle-width": 36,
+    "sheet-handle-height": 4,
+    "notification-radius": 20
+  },
+  "gradient": {
+    "steel": ["{color.palette.secondary}", "{color.palette.dark-panel}", "{color.palette.ink}"],
+    "steel-stops": [0, 0.55, 1]
+  },
+  "row": { "padding-vertical": 12, "padding-start": 16, "padding-end": 12, "gap": 12 }
+}
