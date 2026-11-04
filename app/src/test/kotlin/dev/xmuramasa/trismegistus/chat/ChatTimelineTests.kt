@@ -8,6 +8,7 @@ import dev.xmuramasa.trismegistus.core.state.SessionState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class ChatTimelineTests {
     private fun event(run: String, seq: Long, payload: EventPayload) = ServerMessage.Event("s", run, seq, 1_000L * seq, payload)
@@ -67,5 +68,26 @@ class ChatTimelineTests {
         assertEquals("/etc/hosts", ChatTimeline.argumentSummary("""{"path":"/etc/hosts"}"""))
         assertEquals("not json", ChatTimeline.argumentSummary("not json"))
         assertEquals(null, ChatTimeline.argumentSummary(null))
+    }
+
+    /** android#8: a steer sits after the event it was sent after; a stored one is marked, without Hermes' wrapper. */
+    @Test
+    fun steersSitAmongTheirRunsEvents() {
+        val events = listOf(
+            event("r1", 1, EventPayload.Answer("Looking.")),
+            event("r1", 2, EventPayload.SubagentStarted("sa", goal = "Draw it")),
+        )
+        val prompt = OutgoingPrompt("c1", "Draw the menu", OutgoingPrompt.Status.Sent("r1"))
+        val steer = OutgoingPrompt("st", "with the camera", OutgoingPrompt.Status.Sent("r1"), isSteer = true, afterSeq = 1)
+        val items = ChatTimeline.items(SessionState("s", events = events, outbox = listOf(prompt, steer)))
+        assertEquals(listOf("pc1", "er1.1", "sst", "er1.2"), items.map { it.key })
+        assertTrue((items[2] as ChatItem.User).isSteer)
+        // A steer whose run has no events yet still shows.
+        val early = ChatTimeline.items(SessionState("s", outbox = listOf(steer.copy(afterSeq = 0))))
+        assertEquals(listOf("sst"), early.map { it.key })
+        val stored = ChatTimeline.items(
+            SessionState("s", history = listOf(HistoryMessage("9", HistoryMessage.Role.USER, "with the camera", displayKind = HistoryMessage.STEER))),
+        )
+        assertTrue((stored.single() as ChatItem.User).isSteer)
     }
 }

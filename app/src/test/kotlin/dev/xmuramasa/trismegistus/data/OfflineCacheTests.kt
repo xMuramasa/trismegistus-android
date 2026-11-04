@@ -24,6 +24,7 @@ class OfflineCacheTests {
         HistoryMessage("1", HistoryMessage.Role.USER, "Look", timestamp = 12.5, attachments = listOf(AttachmentRef("a".repeat(64), "image/jpeg", 4, 3))),
         HistoryMessage("2", HistoryMessage.Role.ASSISTANT, "", toolCalls = listOf(HistoryMessage.ToolCall("c1", "terminal", """{"command":"ls"}"""))),
         HistoryMessage("3", HistoryMessage.Role.TOOL, "out", toolCallId = "c1", toolName = "terminal"),
+        HistoryMessage("4", HistoryMessage.Role.USER, "with the camera", displayKind = HistoryMessage.STEER),
     )
     private val events = listOf(
         ServerMessage.Event("a", "r1", 1, 1000, EventPayload.ToolStarted("terminal", "ls")),

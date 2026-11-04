@@ -102,7 +102,7 @@ public class SessionStore(
             }
         }
         for ((id, s) in mutableSessions.value) {
-            if (!s.historyLoaded && s.historyError == null && id !in loading) loadHistory(id)
+            if ((!s.historyLoaded || s.historyStale) && s.historyError == null && id !in loading) loadHistory(id)
         }
     }
 
@@ -164,6 +164,17 @@ public class SessionStore(
         } catch (_: Exception) {
             failed(null, "Not connected to the relay.")
         }
+        return id
+    }
+
+    /**
+     * Steers [runId] with [text] and keeps it in the session's outbox until the history has it (steers are text only).
+     * Throws when the client can't send it (not connected): nothing is added then.
+     */
+    public fun sendSteer(sessionId: String, runId: String, text: String): String {
+        client.send(ClientMessage.Steer(runId, text))
+        val id = UUID.randomUUID().toString()
+        updateSession(sessionId) { it.steerSent(id, runId, text) }
         return id
     }
 

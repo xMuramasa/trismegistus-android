@@ -111,6 +111,7 @@ class OfflineCache(private val file: File) {
             }
             m.toolCallId?.let { put("tool_call_id", it) }
             m.toolName?.let { put("tool_name", it) }
+            m.displayKind?.let { put("display_kind", it) }
             m.timestamp?.let { put("timestamp", it) }
             if (m.attachments.isNotEmpty()) {
                 putJsonArray("attachments") { m.attachments.forEach { add(json.encodeToJsonElement(AttachmentRef.serializer(), it)) } }

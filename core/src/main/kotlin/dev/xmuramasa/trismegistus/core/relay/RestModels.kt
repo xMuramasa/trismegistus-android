@@ -61,15 +61,41 @@ public data class HistoryMessage(
     val timestamp: Double? = null,
     /** The relay's images on a user message its run sent with them (Hermes keeps only a `[screenshot]` line). */
     val attachments: List<AttachmentRef> = emptyList(),
+    /** Hermes' `display_kind`: `steer` for a message sent into a running turn; null for a plain one. */
+    val displayKind: String? = null,
 ) {
     public enum class Role { USER, ASSISTANT, TOOL }
+
+    /** A steer: [content] is the text that was sent, without Hermes' out-of-band wrapper. */
+    val isSteer: Boolean get() = displayKind == STEER
 
     public data class ToolCall(val id: String?, val name: String, val arguments: String?)
 
     public companion object {
-        /** Null for what the app doesn't show (system messages) or can't read: Hermes objects pass through unchecked. */
+        public const val STEER: String = "steer"
+        private const val HIDDEN = "hidden"
+        private const val WRAP_OPEN = "[OUT-OF-BAND USER MESSAGE"
+        private const val WRAP_CLOSE = "[/OUT-OF-BAND USER MESSAGE]"
+
+        /**
+         * The text a steer was sent with: Hermes stores it as `[OUT-OF-BAND USER MESSAGE — ...]`, a newline, the
+         * text, a newline and `[/OUT-OF-BAND USER MESSAGE]`. Anything else comes back unchanged.
+         */
+        public fun unwrapSteer(content: String): String {
+            if (!content.startsWith(WRAP_OPEN)) return content
+            val start = content.indexOf('\n').takeIf { it >= 0 } ?: return content
+            val end = content.lastIndexOf(WRAP_CLOSE).takeIf { it > start } ?: content.length
+            return content.substring(start + 1, end).trim()
+        }
+
+        /**
+         * Null for what the app doesn't show (system messages, Hermes' `hidden` ones) or can't read: Hermes objects
+         * pass through unchecked.
+         */
         public fun fromJson(element: JsonElement): HistoryMessage? {
             val o = element as? JsonObject ?: return null
+            val kind = o.string("display_kind")
+            if (kind == HIDDEN) return null
             val idValue = o["id"] as? JsonPrimitive ?: return null
             val id = if (idValue.isString) idValue.content else idValue.longOrNull?.toString() ?: return null
             val role = when (o.string("role")) {
@@ -86,15 +112,17 @@ public data class HistoryMessage(
             val attachments = (o["attachments"] as? JsonArray).orEmpty().mapNotNull {
                 runCatching { RestJson.decodeFromJsonElement(AttachmentRef.serializer(), it) }.getOrNull()
             }
+            val content = o.string("content") ?: ""
             return HistoryMessage(
                 id = id,
                 role = role,
-                content = o.string("content") ?: "",
+                content = if (kind == STEER) unwrapSteer(content) else content,
                 toolCalls = calls,
                 toolCallId = o.string("tool_call_id"),
                 toolName = o.string("tool_name"),
                 timestamp = (o["timestamp"] as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull,
                 attachments = attachments,
+                displayKind = kind,
             )
         }
     }

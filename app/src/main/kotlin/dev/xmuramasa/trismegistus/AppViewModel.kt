@@ -213,7 +213,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** A steer during a run (text only: the tray waits), else a prompt with the tray's images. False if nothing went. */
     fun submit(sessionId: String, text: String, runId: String?): Boolean {
         val s = mutableSession.value ?: return false
-        if (runId != null) return sendNow(ClientMessage.Steer(runId, text))
+        if (runId != null) {
+            return try {
+                s.store.sendSteer(sessionId, runId, text)
+                true
+            } catch (_: Exception) {
+                say("Not connected to the relay. Try again.")
+                false
+            }
+        }
         val images = mutableTrays.value[sessionId].orEmpty()
         mutableTrays.value -= sessionId
         viewModelScope.launch { s.store.sendPrompt(sessionId, text, images.map { ImageUpload(it.image.jpeg, "image/jpeg") }) }

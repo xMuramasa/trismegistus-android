@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -37,7 +36,6 @@ import dev.xmuramasa.trismegistus.TrayImage
 import dev.xmuramasa.trismegistus.core.relay.DeviceRole
 import dev.xmuramasa.trismegistus.image.ImageSizing
 import dev.xmuramasa.trismegistus.ui.components.ButtonKind
-import dev.xmuramasa.trismegistus.ui.components.EndfieldButton
 import dev.xmuramasa.trismegistus.ui.components.EndfieldIconButton
 import dev.xmuramasa.trismegistus.ui.components.Glyph
 import dev.xmuramasa.trismegistus.ui.components.RoleText
@@ -54,8 +52,9 @@ import java.io.File
 class ComposerState(val runId: String?, val approvalOpen: Boolean, val canAttach: Boolean, val isViewer: Boolean)
 
 /**
- * 02a, 02d: the field grows to six lines, then scrolls (Enter is a newline); SEND, or STEER plus Stop during a run.
- * Images from the photo picker or the camera wait in a tray above the field.
+ * 04c (#7): one row, attach, camera, the field, then Send; during a run Stop and Steer in Send's place, all three
+ * square icons (the yellow one sends: a steer during a run). The field grows to six lines, then scrolls (Enter is a
+ * newline); the buttons stay on its last line. Images from the photo picker or the camera wait in a tray above.
  */
 @Composable
 fun Composer(model: AppViewModel, sessionId: String, state: ComposerState, tray: List<TrayImage>) {
@@ -109,18 +108,7 @@ fun Composer(model: AppViewModel, sessionId: String, state: ComposerState, tray:
                     color = Ink.Text.secondary,
                 )
             }
-            SunkenField(
-                draft,
-                { draft = it },
-                when {
-                    state.approvalOpen -> "Steer or wait"
-                    steering -> "Steer this run"
-                    else -> "Message Hermes"
-                },
-                Modifier.fillMaxWidth(),
-                maxLines = COMPOSER_LINES,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalAlignment = Alignment.Bottom) {
                 IconButton(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = state.canAttach) {
                     Glyph(Glyphs.clip, tint = if (state.canAttach) Ink.Text.primary else Ink.Text.muted, description = "Attach images")
                 }
@@ -134,25 +122,38 @@ fun Composer(model: AppViewModel, sessionId: String, state: ComposerState, tray:
                     },
                     enabled = state.canAttach,
                 ) { Glyph(Glyphs.camera, tint = if (state.canAttach) Ink.Text.primary else Ink.Text.muted, description = "Take a photo") }
-                Spacer(Modifier.weight(1f))
+                SunkenField(
+                    draft,
+                    { draft = it },
+                    when {
+                        state.approvalOpen -> "Steer or wait"
+                        steering -> "Steer this run"
+                        else -> "Message Hermes"
+                    },
+                    // Touch-tall on one line, so the field lines up with the 48 dp buttons beside it.
+                    Modifier.weight(1f).padding(vertical = Space.xxs),
+                    maxLines = COMPOSER_LINES,
+                )
                 val runId = state.runId
                 if (runId != null) {
-                    EndfieldIconButton(Glyphs.stop, "Stop", { model.stop(runId) }, kind = ButtonKind.DANGER)
+                    EndfieldIconButton(Glyphs.stop, "Stop", { model.stop(runId) }, kind = ButtonKind.DANGER, glyphSize = Sizes.iconTab)
                     // While an approval is open, ONCE is the primary action.
-                    EndfieldButton(
+                    EndfieldIconButton(
+                        Glyphs.steer,
                         "Steer",
                         { if (model.submit(sessionId, text, runId)) draft = "" },
                         kind = if (state.approvalOpen) ButtonKind.PLAIN else ButtonKind.PRIMARY,
-                        glyph = Glyphs.steer,
                         enabled = text.isNotEmpty(),
+                        glyphSize = Sizes.iconTab,
                     )
                 } else {
-                    EndfieldButton(
+                    EndfieldIconButton(
+                        Glyphs.send,
                         "Send",
                         { if (model.submit(sessionId, text, null)) draft = "" },
                         kind = ButtonKind.PRIMARY,
-                        glyph = Glyphs.send,
                         enabled = sendable,
+                        glyphSize = Sizes.iconTab,
                     )
                 }
             }

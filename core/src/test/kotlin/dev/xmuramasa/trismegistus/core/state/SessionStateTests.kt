@@ -8,6 +8,7 @@ import dev.xmuramasa.trismegistus.core.protocol.RunStatus
 import dev.xmuramasa.trismegistus.core.protocol.ServerMessage
 import dev.xmuramasa.trismegistus.core.relay.HistoryMessage
 import kotlin.test.Test
+import kotlinx.serialization.json.Json
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -122,5 +123,62 @@ class SessionStateTests {
         assertEquals(SessionState.MAX_EVENTS, s.events.size)
         assertEquals(6L, s.events.first().seq)
         assertFalse(s.historyLoaded)
+    }
+
+    /** android#8: a run this device didn't start means a prompt only the history has; its first event asks again. */
+    @Test
+    fun anotherDevicesRunAsksForTheHistory() {
+        var s = SessionState("s1").applyHistory(answeredHistory).feed(ServerMessage.Run("run_9", "s1", RunStatus.RUNNING))
+        assertTrue(s.historyStale)
+        assertTrue(s.historyLoaded) // the timeline stays on screen while it reloads
+        s = s.applyHistory(answeredHistory)
+        assertFalse(s.historyStale)
+        s = s.feed(event("s1", 1, EventPayload.ToolStarted("terminal"), run = "run_9"))
+        assertTrue(s.historyStale) // Hermes stores the prompt a few ms after the relay announces the run
+        s = s.applyHistory(answeredHistory).feed(event("s1", 2, EventPayload.Answer("Hi."), run = "run_9"))
+        assertFalse(s.historyStale)
+        assertEquals(listOf(1L, 2L), s.events.map { it.seq }) // the running turn's live events stay
+        s = s.feed(event("s1", 3, EventPayload.RunCompleted, run = "run_9"))
+        assertTrue(s.historyStale && s.run == null)
+    }
+
+    @Test
+    fun ownRunAsksForTheHistoryOnlyWhenItEnds() {
+        var s = SessionState("s1", outbox = listOf(OutgoingPrompt("c1", "hi", OutgoingPrompt.Status.Pending))).applyHistory(answeredHistory)
+            .feed(
+                ServerMessage.Ack("c1", "run_1", replayed = false),
+                ServerMessage.Run("run_1", "s1", RunStatus.RUNNING),
+                event("s1", 1, EventPayload.ToolStarted("terminal")),
+            )
+        assertFalse(s.historyStale)
+        s = s.feed(ServerMessage.Run("run_1", "s1", RunStatus.COMPLETED))
+        assertTrue(s.historyStale)
+    }
+
+    /** android#8: a steer shows at once and stays until Hermes has stored it, or its run ends without it. */
+    @Test
+    fun steersStayUntilTheHistoryHasThem() {
+        var s = SessionState("s1", outbox = listOf(OutgoingPrompt("c1", "hi", OutgoingPrompt.Status.Pending))).applyHistory(answeredHistory)
+            .feed(ServerMessage.Ack("c1", "run_1", replayed = false), event("s1", 4, EventPayload.ToolStarted("terminal")))
+            .steerSent("st1", "run_1", "use the camera")
+        val steer = s.outbox.last()
+        assertTrue(steer.isSteer && steer.afterSeq == 4L && steer.status == OutgoingPrompt.Status.Sent("run_1"))
+        assertFalse(s.historyStale) // sending one doesn't reload
+        s = s.applyHistory(answeredHistory) // Hermes takes a steer at its next step
+        assertEquals(listOf("st1"), s.outbox.map { it.id })
+        val stored = answeredHistory + HistoryMessage("3", HistoryMessage.Role.USER, "use the camera", displayKind = HistoryMessage.STEER)
+        assertTrue(s.applyHistory(stored).outbox.isEmpty())
+        assertTrue(s.feed(event("s1", 5, EventPayload.RunCompleted)).applyHistory(answeredHistory).outbox.isEmpty())
+    }
+
+    @Test
+    fun hermesSteersAreUnwrappedAndHiddenMessagesSkipped() {
+        val wrapped = """{"id":12,"role":"user","display_kind":"steer","content":"[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not tool output and not a new delivery when replayed from conversation history]\nalso the android messages don't show in the app\n[/OUT-OF-BAND USER MESSAGE]"}"""
+        val m = HistoryMessage.fromJson(Json.parseToJsonElement(wrapped))!!
+        assertTrue(m.isSteer)
+        assertEquals("also the android messages don't show in the app", m.content)
+        assertNull(HistoryMessage.fromJson(Json.parseToJsonElement("""{"id":13,"role":"assistant","display_kind":"hidden","content":""}""")))
+        assertEquals("plain [OUT-OF-BAND text", HistoryMessage.unwrapSteer("plain [OUT-OF-BAND text"))
+        assertFalse(HistoryMessage.fromJson(Json.parseToJsonElement("""{"id":14,"role":"user","content":"hi"}"""))!!.isSteer)
     }
 }

@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.xmuramasa.trismegistus.ui.theme.Ink
@@ -89,6 +90,7 @@ fun EndfieldIconButton(
     modifier: Modifier = Modifier,
     kind: ButtonKind = ButtonKind.PLAIN,
     enabled: Boolean = true,
+    glyphSize: Dp = Sizes.iconSmall,
 ) {
     val look = look(kind)
     OutlinedButton(
@@ -96,11 +98,16 @@ fun EndfieldIconButton(
         modifier = modifier.size(Sizes.buttonHeight),
         enabled = enabled,
         shape = RectangleShape,
-        border = BorderStroke(Strokes.hairline, look.border),
-        colors = ButtonDefaults.outlinedButtonColors(containerColor = look.fill, contentColor = look.content),
+        border = BorderStroke(Strokes.hairline, if (enabled) look.border else Ink.Line.rule),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = look.fill,
+            contentColor = look.content,
+            disabledContainerColor = Ink.Surface.sunken,
+            disabledContentColor = Ink.Text.muted,
+        ),
         contentPadding = PaddingValues(),
     ) {
-        Glyph(glyph, size = Sizes.iconSmall, tint = look.content, description = description)
+        Glyph(glyph, size = glyphSize, tint = if (enabled) look.content else Ink.Text.muted, description = description)
     }
 }
 

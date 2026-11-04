@@ -17,8 +17,19 @@ public data class PendingApproval(val sessionId: String, val runId: String, val 
 /** An image for a prompt; [attachmentId] once uploaded. The bytes are kept so a retry can upload them again. */
 public class ImageUpload(public val data: ByteArray, public val mime: String, public val attachmentId: String? = null)
 
-/** A prompt the app sent, shown until the history has it. [id] is its client_msg_id. */
-public data class OutgoingPrompt(val id: String, val text: String, val status: Status, val images: List<ImageUpload> = emptyList()) {
+/**
+ * A prompt the app sent, shown until the history has it. [id] is its client_msg_id. A steer ([isSteer]) is [Status.Sent]
+ * from the start (the relay doesn't acknowledge steers) and stays until the history has its text or its run ends;
+ * [afterSeq] is the session's seq when it was sent, so the timeline places it among the run's events.
+ */
+public data class OutgoingPrompt(
+    val id: String,
+    val text: String,
+    val status: Status,
+    val images: List<ImageUpload> = emptyList(),
+    val isSteer: Boolean = false,
+    val afterSeq: Long = 0,
+) {
     public sealed interface Status {
         public data object Pending : Status
 
@@ -47,17 +58,37 @@ public data class SessionState(
     val run: ActiveRun? = null,
     val approvals: List<PendingApproval> = emptyList(),
     val outbox: List<OutgoingPrompt> = emptyList(),
+    /**
+     * The history misses something another device sent or a run just finished: the store reloads it, keeping the
+     * timeline on screen meanwhile (unlike [historyLoaded] false). The relay's stream carries no event for a prompt
+     * or a steer, so a run this device didn't start is the only sign of one.
+     */
+    val historyStale: Boolean = false,
+    /** The run this device didn't start whose first event already asked for a reload (Hermes stores its prompt late). */
+    val rechecked: String? = null,
 ) {
     public companion object {
         public const val MAX_EVENTS: Int = 1000
     }
+
+    /** This device's prompt started [runId] (its ack named it). */
+    public fun isOwnRun(runId: String): Boolean =
+        outbox.any { !it.isSteer && (it.status as? OutgoingPrompt.Status.Sent)?.runId == runId }
+
+    /** A steer sent into the running turn: shown at once, until the history has it. */
+    public fun steerSent(id: String, runId: String, text: String): SessionState =
+        copy(outbox = outbox + OutgoingPrompt(id, text, OutgoingPrompt.Status.Sent(runId), isSteer = true, afterSeq = lastSeq))
 
     public fun apply(message: ServerMessage): SessionState = when (message) {
         is ServerMessage.Event -> if (message.sessionId == id) apply(message) else this
         is ServerMessage.Run -> when {
             message.sessionId != id -> this
             message.status.isTerminal -> end(message.runId)
-            else -> copy(run = ActiveRun(message.runId, message.status))
+            else -> copy(
+                run = ActiveRun(message.runId, message.status),
+                // A run that appears without our ack: another device's prompt, which only the history has.
+                historyStale = historyStale || (run?.id != message.runId && !isOwnRun(message.runId)),
+            )
         }
         is ServerMessage.Ack -> {
             if (outbox.none { it.id == message.clientMsgId }) {
@@ -101,26 +132,49 @@ public data class SessionState(
                 approvals = approvals.filter { it.id != p.requestId },
                 run = run?.takeIf { it.id == e.runId }?.copy(status = RunStatus.RUNNING) ?: run,
             )
-            EventPayload.RunCompleted, is EventPayload.RunFailed, is EventPayload.RunCancelled -> s.end(e.runId)
+            EventPayload.RunCompleted, is EventPayload.RunFailed, is EventPayload.RunCancelled -> return s.end(e.runId)
             is EventPayload.ToolStarted, is EventPayload.ToolCompleted, is EventPayload.SubagentStarted,
             is EventPayload.SubagentCompleted, EventPayload.SteerQueued ->
                 if (run?.id != e.runId) s.copy(run = ActiveRun(e.runId, RunStatus.RUNNING)) else s
             is EventPayload.Answer, is EventPayload.Reconnected, is EventPayload.Unknown -> s
-        }
+        }.recheck(e.runId)
     }
 
-    private fun end(runId: String): SessionState =
-        copy(run = run?.takeIf { it.id != runId }, approvals = approvals.filter { it.runId != runId })
+    /**
+     * The first event of a run this device didn't start asks for the history once more: Hermes stores the prompt a few
+     * ms after the relay announces the run, so the reload the announcement caused may have missed it.
+     */
+    private fun recheck(runId: String): SessionState =
+        if (rechecked == runId || isOwnRun(runId)) this else copy(historyStale = true, rechecked = runId)
+
+    /** A run ended: the history has the finished turn (and any prompt or steer this device didn't see). */
+    private fun end(runId: String): SessionState = copy(
+        run = run?.takeIf { it.id != runId },
+        approvals = approvals.filter { it.runId != runId },
+        historyStale = true,
+    )
 
     /**
      * trismegistus #11: history that arrives after live events already holds every finished turn. Keep only the
      * live events of the run still going and the prompts the relay hasn't acknowledged, so nothing shows twice.
      */
-    public fun applyHistory(messages: List<HistoryMessage>): SessionState = copy(
-        history = messages,
-        historyLoaded = true,
-        historyError = null,
-        events = events.filter { it.runId == run?.id },
-        outbox = outbox.filter { it.status !is OutgoingPrompt.Status.Sent },
-    )
+    public fun applyHistory(messages: List<HistoryMessage>): SessionState {
+        val steers = messages.filter { it.isSteer }.map { it.content.trim() }.toSet()
+        return copy(
+            history = messages,
+            historyLoaded = true,
+            historyError = null,
+            historyStale = false,
+            events = events.filter { it.runId == run?.id },
+            outbox = outbox.filter { p ->
+                val sent = p.status as? OutgoingPrompt.Status.Sent
+                when {
+                    sent == null -> true
+                    // A steer is stored when Hermes takes it (the next step), not when sent: keep it until then.
+                    p.isSteer -> sent.runId == run?.id && p.text.trim() !in steers
+                    else -> false
+                }
+            },
+        )
+    }
 }

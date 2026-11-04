@@ -23,7 +23,10 @@ sealed interface ChatImage {
 sealed interface ChatItem {
     val key: String
 
-    /** A message of yours; [status] is set while it is a prompt the history doesn't have yet. */
+    /**
+     * A message of yours; [status] is set while it is a prompt the history doesn't have yet. [isSteer]: sent into a
+     * running turn (from the outbox, or Hermes' stored steer without its wrapper).
+     */
     data class User(
         override val key: String,
         val text: String,
@@ -31,6 +34,7 @@ sealed interface ChatItem {
         val images: List<ChatImage> = emptyList(),
         val status: OutgoingPrompt.Status? = null,
         val promptId: String? = null,
+        val isSteer: Boolean = false,
     ) : ChatItem
 
     data class Answer(override val key: String, val text: String, val time: Long?) : ChatItem
@@ -56,8 +60,9 @@ sealed interface ChatItem {
 
 /**
  * A session's rows: the history, then the prompts the history doesn't have yet, each followed by its run's live
- * events, then the live events of other runs. A run's commands are summed up in one marker (the transcript has them);
- * other tools are folded rows.
+ * events, then the live events of other runs. Steers not in the history yet sit among their run's events, after the
+ * last one seen when they were sent. A run's commands are summed up in one marker (the transcript has them); other
+ * tools are folded rows.
  */
 object ChatTimeline {
     /** What a folded tool row shows of its output. */
@@ -66,14 +71,18 @@ object ChatTimeline {
     fun items(state: SessionState): List<ChatItem> {
         val items = history(state.history).toMutableList()
         val runs = state.events.groupBy { it.runId }
+        val steers = state.outbox.filter { it.isSteer }.groupBy { (it.status as? OutgoingPrompt.Status.Sent)?.runId }
         val placed = mutableSetOf<String>()
-        for (p in state.outbox) {
-            items += ChatItem.User("p${p.id}", p.text, null, p.images.map { ChatImage.Local(it.data) }, p.status, p.id)
-            val runId = (p.status as? OutgoingPrompt.Status.Sent)?.runId ?: continue
-            runs[runId]?.let { items += run(runId, it) }
-            placed += runId
+        fun place(runId: String) {
+            if (placed.add(runId)) items += run(runId, runs[runId].orEmpty(), steers[runId].orEmpty())
         }
-        for ((runId, events) in runs) if (runId !in placed) items += run(runId, events)
+        for (p in state.outbox) {
+            if (p.isSteer) continue
+            items += ChatItem.User("p${p.id}", p.text, null, p.images.map { ChatImage.Local(it.data) }, p.status, p.id)
+            place((p.status as? OutgoingPrompt.Status.Sent)?.runId ?: continue)
+        }
+        for (runId in runs.keys) place(runId)
+        for (runId in steers.keys) place(runId ?: continue)
         return items
     }
 
@@ -87,7 +96,7 @@ object ChatTimeline {
             val time = m.timestamp?.let { (it * 1000).roundToLong() }
             when (m.role) {
                 HistoryMessage.Role.USER -> listOf(
-                    ChatItem.User("h${m.id}", m.content, time, m.attachments.map { ChatImage.Remote(it.id) }),
+                    ChatItem.User("h${m.id}", m.content, time, m.attachments.map { ChatImage.Remote(it.id) }, isSteer = m.isSteer),
                 )
                 HistoryMessage.Role.ASSISTANT ->
                     listOfNotNull(m.content.takeIf { it.isNotBlank() }?.let { ChatItem.Answer("h${m.id}", it, time) }) +
@@ -102,23 +111,26 @@ object ChatTimeline {
         }
     }
 
-    private fun run(runId: String, events: List<ServerMessage.Event>): List<ChatItem> {
+    /** Rows sort by seq doubled; a steer sent after seq n sorts at 2n + 1, after that event and before the next. */
+    private fun run(runId: String, events: List<ServerMessage.Event>, steers: List<OutgoingPrompt>): List<ChatItem> {
         val entries = CommandLog.entries(events)
         val rows = mutableListOf<Pair<Long, ChatItem>>()
+        fun MutableList<Pair<Long, ChatItem>>.add(seq: Long, item: ChatItem) = add(seq * 2 to item)
         val commands = entries.filter { it.isCommand }
-        if (commands.isNotEmpty()) rows += commands.first().id to ChatItem.Marker("m$runId", runId, CommandLog.summary(entries, runId))
+        if (commands.isNotEmpty()) rows.add(commands.first().id, ChatItem.Marker("m$runId", runId, CommandLog.summary(entries, runId)))
         for (t in entries) {
             if (t.isCommand) continue
-            rows += t.id to ChatItem.Tool("t$runId.${t.id}", t.tool, t.command, t.output?.take(OUTPUT_LIMIT), t.duration, t.isError, t.isRunning)
+            rows.add(t.id, ChatItem.Tool("t$runId.${t.id}", t.tool, t.command, t.output?.take(OUTPUT_LIMIT), t.duration, t.isError, t.isRunning))
         }
+        for (p in steers) rows += p.afterSeq * 2 + 1 to ChatItem.User("s${p.id}", p.text, null, status = p.status, promptId = p.id, isSteer = true)
         val subagents = mutableMapOf<String, Int>()
         for (e in events) {
             val key = "e$runId.${e.seq}"
             when (val p = e.payload) {
-                is EventPayload.Answer -> rows += e.seq to ChatItem.Answer(key, p.text, e.ts)
+                is EventPayload.Answer -> rows.add(e.seq, ChatItem.Answer(key, p.text, e.ts))
                 is EventPayload.SubagentStarted -> {
                     subagents[p.subagentId] = rows.size
-                    rows += e.seq to ChatItem.Subagent(key, p.goal ?: "Subagent", null, null)
+                    rows.add(e.seq, ChatItem.Subagent(key, p.goal ?: "Subagent", null, null))
                 }
                 is EventPayload.SubagentCompleted -> {
                     val i = subagents[p.subagentId]
@@ -126,13 +138,13 @@ object ChatTimeline {
                         val (seq, row) = rows[i]
                         rows[i] = seq to (row as ChatItem.Subagent).copy(duration = p.duration, status = p.status)
                     } else {
-                        rows += e.seq to ChatItem.Subagent(key, p.summary ?: "Subagent", p.duration, p.status)
+                        rows.add(e.seq, ChatItem.Subagent(key, p.summary ?: "Subagent", p.duration, p.status))
                     }
                 }
-                is EventPayload.RunFailed -> rows += e.seq to ChatItem.Note(key, p.error ?: "The run failed.", isError = true)
-                is EventPayload.RunCancelled -> rows += e.seq to ChatItem.Note(key, "Stopped.", isError = false)
+                is EventPayload.RunFailed -> rows.add(e.seq, ChatItem.Note(key, p.error ?: "The run failed.", isError = true))
+                is EventPayload.RunCancelled -> rows.add(e.seq, ChatItem.Note(key, "Stopped.", isError = false))
                 is EventPayload.Reconnected ->
-                    rows += e.seq to ChatItem.Note(key, "The relay lost Hermes' stream for a moment: some steps may be missing.", isError = false)
+                    rows.add(e.seq, ChatItem.Note(key, "The relay lost Hermes' stream for a moment: some steps may be missing.", isError = false))
                 else -> Unit
             }
         }

@@ -82,7 +82,7 @@ private val markdownStyle = MarkdownStyle(
 fun UserMessage(item: ChatItem.User, session: RelaySession, retry: () -> Unit) {
     val pending = item.status is OutgoingPrompt.Status.Pending
     Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-        RoleText(stamp("You", item.time) + if (pending) " // sending" else "", Type.label, color = Ink.Text.secondary)
+        RoleText(stamp(if (item.isSteer) "You // steer" else "You", item.time) + if (pending) " // sending" else "", Type.label, color = Ink.Text.secondary)
         if (item.images.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
                 for (image in item.images) {

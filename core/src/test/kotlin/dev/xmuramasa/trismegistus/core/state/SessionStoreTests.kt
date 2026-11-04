@@ -9,6 +9,7 @@ import dev.xmuramasa.trismegistus.core.protocol.ApprovalChoice
 import dev.xmuramasa.trismegistus.core.protocol.ClientMessage
 import dev.xmuramasa.trismegistus.core.protocol.ErrorCode
 import dev.xmuramasa.trismegistus.core.protocol.EventPayload
+import dev.xmuramasa.trismegistus.core.protocol.RunStatus
 import dev.xmuramasa.trismegistus.core.protocol.ServerMessage
 import dev.xmuramasa.trismegistus.core.relay.ConnectionState
 import dev.xmuramasa.trismegistus.core.relay.RelayApiException
@@ -17,6 +18,7 @@ import dev.xmuramasa.trismegistus.core.relay.RelayRest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
@@ -74,8 +76,9 @@ class SessionStoreTests {
         assertEquals(1, historyLoads("s1"))
         assertTrue(session("s1").historyLoaded)
         store.handle(RelayClient.Output.Message(event("s1", 40, EventPayload.RunCompleted)))
+        assertEquals(2, historyLoads("s1")) // a run ended: the history has the finished turn
         store.handle(RelayClient.Output.Message(ServerMessage.Error(ErrorCode.REPLAY_GAP, "reload the history", "s1")))
-        assertEquals(2, historyLoads("s1"))
+        assertEquals(3, historyLoads("s1"))
         assertTrue(session("s1").historyLoaded && session("s1").history.size == 2)
         store.handle(RelayClient.Output.Message(event("s1", 1, EventPayload.ToolStarted("terminal"), run = "run_2")))
         assertEquals(listOf(1L), session("s1").events.map { it.seq })
@@ -91,7 +94,7 @@ class SessionStoreTests {
         store.handle(RelayClient.Output.State(ConnectionState.Disconnected))
         store.handle(connected)
         assertEquals(2, historyLoads("s1")) // no seq: resubscribed live only, so reload
-        assertEquals(1, historyLoads("s2")) // resumed from seq 5
+        assertEquals(2, historyLoads("s2")) // once for the first event of a run it didn't start; resumed from seq 5
         assertEquals(connected.state, store.connection.value)
     }
 
@@ -164,6 +167,27 @@ class SessionStoreTests {
         val pin = runCatching { store.setPinned("s1", true) }.exceptionOrNull()
         assertTrue(pin is RelayApiException)
         assertNull(store.sessionList.value.single().pinned)
+    }
+
+    /** android#8: another device's prompt reaches an open conversation through the history, at once and at the end. */
+    @Test
+    fun anotherDevicesRunReloadsTheHistory() = runTest {
+        store.open("s1")
+        store.handle(RelayClient.Output.Message(ServerMessage.Run("run_9", "s1", RunStatus.RUNNING)))
+        assertEquals(2, historyLoads("s1"))
+        store.handle(RelayClient.Output.Message(event("s1", 1, EventPayload.ToolStarted("terminal"), run = "run_9")))
+        store.handle(RelayClient.Output.Message(event("s1", 2, EventPayload.Answer("Hi."), run = "run_9")))
+        assertEquals(3, historyLoads("s1"))
+        store.handle(RelayClient.Output.Message(event("s1", 3, EventPayload.RunCompleted, run = "run_9")))
+        assertEquals(4, historyLoads("s1"))
+        assertFalse(session("s1").historyStale)
+    }
+
+    @Test
+    fun aSteerNeedsTheSocketAndShowsOnceSent() = runTest {
+        store.open("s1")
+        assertTrue(runCatching { store.sendSteer("s1", "run_1", "hi") }.isFailure)
+        assertTrue(session("s1").outbox.isEmpty())
     }
 
     private companion object {
