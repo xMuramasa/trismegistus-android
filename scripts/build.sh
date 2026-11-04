@@ -14,7 +14,10 @@ fi
 tasks=("$@")
 [ ${#tasks[@]} -gt 0 ] || tasks=(test lintDebug assembleDebug assembleRelease)
 tty=(); [ -t 1 ] && tty=(-t)
-exec docker run --rm "${tty[@]}" --user "$(id -u):$(id -g)" \
+# Hard memory cap, no swap: a build that outgrows it is OOM-killed inside its container instead of pushing the host
+# into swap until it freezes (an uncapped build did that on 2026-11-04).
+mem=${TRISMEGISTUS_ANDROID_BUILD_MEMORY:-3g}
+exec docker run --rm "${tty[@]}" --memory "$mem" --memory-swap "$mem" --user "$(id -u):$(id -g)" \
   -e HOME=/tmp/home -e GRADLE_USER_HOME=/gradle -e ANDROID_USER_HOME=/android \
   -v "$state/gradle:/gradle" -v "$state/android:/android" -v "$state/signing:/signing:ro" \
   -v "$root:/src" -w /src "$image" ./gradlew --no-daemon --console=plain "${tasks[@]}"
