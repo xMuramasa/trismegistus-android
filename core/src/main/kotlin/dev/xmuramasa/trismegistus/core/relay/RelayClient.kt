@@ -13,6 +13,7 @@ import dev.xmuramasa.trismegistus.core.protocol.isTerminal
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -214,12 +215,14 @@ public class RelayClient(
             val base = minOf(MAX_BACKOFF, 1.seconds * (1 shl minOf(attempt, 5)))
             attempt++
             val wait = base + base * (0.2 * jitter())
-            emit(job, Output.State(ConnectionState.Reconnecting(attempt, now() + wait.inWholeMilliseconds)))
-            logger.info("relay: reconnect attempt $attempt in $wait")
             coroutineScope {
-                val waiting = launch { sleep(wait) }
+                // Register the wait before the state says Reconnecting: a reconnectNow() that reacts to that state
+                // must find something to cancel (otherwise the call is lost and the full backoff runs).
+                val waiting = launch(start = CoroutineStart.LAZY) { sleep(wait) }
                 synchronized(lock) { backoff = waiting }
-                waiting.join() // cancelled by reconnectNow() or stop()
+                emit(job, Output.State(ConnectionState.Reconnecting(attempt, now() + wait.inWholeMilliseconds)))
+                logger.info("relay: reconnect attempt $attempt in $wait")
+                waiting.join() // starts the wait; cancelled by reconnectNow() or stop()
             }
             synchronized(lock) { backoff = null }
         }

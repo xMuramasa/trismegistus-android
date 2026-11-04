@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 rootProject.name = "trismegistus-android"
 
 include(":core")
+include(":app")

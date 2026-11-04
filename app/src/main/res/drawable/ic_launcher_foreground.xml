@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Trismegistus mark: an ink outline square and an ink T inside the 66 dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M28.5,28.5h51v51h-51z"
+        android:strokeWidth="3"
+        android:strokeColor="@color/ink" />
+    <path
+        android:fillColor="@color/ink"
+        android:pathData="M41,40h26v5.5h-10.25v22.5h-5.5v-22.5h-10.25z" />
+</vector>

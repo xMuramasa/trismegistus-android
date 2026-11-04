@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Endfield paper, ink and yellow (design/endfield-palette.json): the window before Compose draws. -->
+    <color name="paper">#F2F2F2</color>
+    <color name="ink">#191919</color>
+    <color name="yellow">#FFFA00</color>
+
+    <style name="Theme.Trismegistus" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/paper</item>
+    </style>
+
+    <style name="Theme.Trismegistus.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/paper</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_mark</item>
+        <item name="postSplashScreenTheme">@style/Theme.Trismegistus</item>
+    </style>
+</resources>

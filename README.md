@@ -37,3 +37,42 @@ fails while the copy is stale.
 refreshed by `scripts/sync-tokens.sh` (hashes in `design/TOKENS_SOURCE`); `design/android-tokens.json` adds the
 phone's type sizes and component sizes; `design/icons.json` holds the draft's 16-unit stroke icons as SVG paths.
 Inter and JetBrains Mono are bundled in `app/src/main/res/font/` (SIL OFL, `licenses/`).
+
+## App
+
+First start: pair. On optiplex `trismegistus-relay pair --name s21 --role manager --replace` prints a QR and a code;
+the app scans the QR (the camera is asked for only then) or takes the pasted code and the relay URL. The token is
+sealed with an Android Keystore AES-GCM key and kept in the app's DataStore; nothing is backed up or transferred.
+
+Then Chat: ☰ (or a swipe from the left) opens the drawer with the relay status, Chat, this device and settings. The
+list has the kind tabs (APP, TELEGRAM, TERMINAL, MORE), a filter, long-press for pin, rename, tags and delete, and +
+for a new conversation. A conversation shows the approval banner (Once / Session / Deny), the messages, one marker per
+run that opens the command transcript, and the composer: SEND, or STEER and Stop during a run; up to four images
+from the photo picker, the camera or Android's share sheet, made upright, resized to 2048 px and re-encoded without
+EXIF. Read-only sources (Telegram, terminal) have no composer; a viewer device can't attach images.
+
+While the relay can't be reached the app shows the last list and conversations it saved (`files/offline.json`) and
+retries with backoff, and at once when it comes to the foreground. Settings: the connection, the notification
+switches (used by #5), unpair (removes the token, the cache and the images; revoke on the relay with
+`trismegistus-relay devices revoke <name>`).
+
+## Code
+
+- `core/`: protocol, `RelayClient`, `RelayRest`, `SessionStore`, `CommandLog`, `ConversationKind` (Kotlin/JVM, no
+  Android).
+- `app/src/main/kotlin/dev/xmuramasa/trismegistus/`:
+  - `MainActivity`, `AppViewModel` (pairing, the relay session, the back stack in `Nav`, trays, the offline cache);
+  - `data/`: `TokenCipher` (Keystore), `Prefs` (DataStore), `RelaySession` (client, REST, store and an image loader
+    that sends the token to the relay only), `OfflineCache`, `LogcatLogger`;
+  - `chat/`: the pure logic the screens show: `ConversationList`, `ChatTimeline`, `Markdown` (commonmark to
+    `AnnotatedString`), `RelativeTime`;
+  - `image/`: `ImageSizing` (the maths) and `ImagePrep` (decode, EXIF, JPEG); `pairing/PairingInput`;
+  - `ui/`: `theme/` (generated tokens and glyphs, `TrismegistusTheme`, the contour background), `components/`,
+    `shell/` (drawer), `chat/`, `pairing/`, `settings/`.
+- Tokens: `python3 scripts/gen-tokens.py` turns the four `design/` files into `ui/theme/Tokens.kt` (colours with the
+  `{endfield.*}` references resolved, spacing, radius, stroke, opacity, the phone's type roles and sizes, the steel
+  gradient) and `ui/theme/Glyphs.kt` (the icons as `ImageVector`s). `scripts/check-tokens.sh` fails when either is
+  stale or when a file under `ui/` outside `ui/theme/` writes a raw `Color(0x…)` or a `.dp` / `.sp` literal other than
+  0 and 1 (exceptions would go in `scripts/token-allowlist.txt`, one path and a `#` reason per line; none needed yet).
+- Tests: `scripts/build.sh :app:test` runs the app's JVM tests (Markdown, image sizes, the generated tokens against
+  `design/`, the list and timeline logic, navigation, pairing input, the offline cache).

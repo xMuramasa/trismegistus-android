@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The splash: the launcher mark as a yellow square on paper, inside the splash icon's visible circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="@color/yellow"
+        android:pathData="M33,33h42v42h-42z" />
+    <path
+        android:pathData="M34,34h40v40h-40z"
+        android:strokeWidth="2"
+        android:strokeColor="@color/ink" />
+    <path
+        android:fillColor="@color/ink"
+        android:pathData="M43,43h22v4.5h-8.75v18.5h-4.5v-18.5h-8.75z" />
+</vector>
