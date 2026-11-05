@@ -76,3 +76,26 @@ switches (used by #5), unpair (removes the token, the cache and the images; revo
   0 and 1 (exceptions would go in `scripts/token-allowlist.txt`, one path and a `#` reason per line; none needed yet).
 - Tests: `scripts/build.sh :app:test` runs the app's JVM tests (Markdown, image sizes, the generated tokens against
   `design/`, the list and timeline logic, navigation, pairing input, the offline cache).
+
+## QA
+
+Automated UI checks on a headless Android emulator on Martin's Mac, run from optiplex with
+[Maestro](https://maestro.mobile.dev) flows (`qa/flows/*.yaml`):
+
+```
+scripts/build.sh assembleRelease      # the APK under test
+scripts/qa.sh                         # every flow; scripts/qa.sh 02-chat for one
+scripts/qa.sh stop                    # shut the emulator down
+```
+
+- `qa/mac/emulator.sh` (copied to the Mac) creates and boots `Trismegistus_QA`: an S21 FE-sized phone
+  (1080 x 2340, 420 dpi = 411 x 891 dp) on the Android 37 arm64 image Android Studio installed, no window, no
+  animations. It stays up between runs.
+- The emulator is paired with the relay as device `emulator` (manager), once:
+  `docker exec trismegistus-relay trismegistus-relay pair --name emulator --role manager`, code typed into the
+  pairing screen. `scripts/qa.sh setup` once creates the `QA` conversation the chat flows write into (each chat
+  run costs two short Hermes replies).
+- Results: `~/.local/share/trismegistus-android-qa/runs/<stamp>/` (screenshots named after the steps, JUnit
+  `report.xml`, `maestro.log`).
+- Needs on the Mac: Android Studio (SDK, emulator, the image) and Maestro in `~/.maestro` (Java from Android
+  Studio's JBR).

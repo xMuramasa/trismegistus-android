@@ -1,0 +1,29 @@
+# One-off: the "QA" conversation every flow uses, so tests never write into real conversations.
+# Run once per relay (scripts/qa.sh setup). Costs one short Hermes reply.
+appId: dev.xmuramasa.trismegistus
+name: setup the QA conversation
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Chat"
+    timeout: 20000
+# Not before the list has loaded: the empty state's own New conversation button would take the tap and vanish.
+- extendedWaitUntil:
+    visible: "APP // [1-9].*"
+    timeout: 30000
+- tapOn: "New conversation"
+- tapOn: "Message Hermes"
+- inputText: "QA: this conversation is for automated app tests. Answer every message with OK only."
+- hideKeyboard
+- tapOn: "Send"
+- extendedWaitUntil:
+    visible: "OK"
+    timeout: 180000
+- tapOn: "Conversation actions"
+- tapOn: "Rename"
+# The rename field opens with its cursor before "Untitled" (QA finding, see README "QA"): until it selects the old
+# title, finish by hand if the result isn't exactly QA.
+- eraseText: 200
+- inputText: "QA"
+- tapOn: "Save"
+- assertVisible: "QA"

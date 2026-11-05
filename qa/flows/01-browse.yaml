@@ -1,0 +1,33 @@
+# The conversation list, the drawer and settings: no messages sent.
+appId: dev.xmuramasa.trismegistus
+name: browse
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Chat"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "LINKED"
+    timeout: 30000
+# The list loads after the link: wait for a row count, not the empty state.
+- extendedWaitUntil:
+    visible: "APP // [1-9].*"
+    timeout: 30000
+- takeScreenshot: 01-conversations
+- tapOn: "Telegram"
+- takeScreenshot: 02-tab-telegram
+- tapOn: "App"
+- tapOn: "Menu"
+- takeScreenshot: 03-drawer
+- tapOn: "Settings"
+- takeScreenshot: 04-settings
+- scrollUntilVisible:
+    element: "UNPAIR"
+    direction: DOWN
+    optional: true
+- takeScreenshot: 05-settings-bottom
+- back
+- tapOn: "Filter"
+- inputText: "QA"
+- takeScreenshot: 06-filter
+- hideKeyboard

@@ -1,0 +1,40 @@
+# A prompt and a steer in the QA conversation: both must show at once (outbox, then the relay's user.message), the
+# steer as YOU // STEER, and the answer must arrive. Costs two short Hermes replies.
+appId: dev.xmuramasa.trismegistus
+name: chat
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "LINKED"
+    timeout: 30000
+- tapOn: "Filter"
+- inputText: "QA"
+- hideKeyboard
+- tapOn:
+    text: "QA"
+    index: 1
+- extendedWaitUntil:
+    visible: "Message Hermes"
+    timeout: 20000
+- takeScreenshot: 10-conversation
+- tapOn: "Message Hermes"
+- inputText: "QA ${RUN}: run the terminal command sleep 25, then answer OK."
+- hideKeyboard
+- tapOn: "Send"
+- assertVisible: "QA ${RUN}: run the terminal command sleep 25, then answer OK."
+- extendedWaitUntil:
+    visible: "Steer this run"
+    timeout: 60000
+- takeScreenshot: 11-run-composer
+- tapOn: "Steer this run"
+- inputText: "QA steer ${RUN}"
+- hideKeyboard
+- tapOn: "Steer"
+- assertVisible: "QA steer ${RUN}"
+- assertVisible: "YOU // STEER"
+- takeScreenshot: 12-steer
+- extendedWaitUntil:
+    visible: "Message Hermes"
+    timeout: 240000
+- takeScreenshot: 13-answered
+- assertVisible: "QA steer ${RUN}"
