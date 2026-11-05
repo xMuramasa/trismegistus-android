@@ -169,18 +169,31 @@ class SessionStoreTests {
         assertNull(store.sessionList.value.single().pinned)
     }
 
-    /** android#8: another device's prompt reaches an open conversation through the history, at once and at the end. */
+    /** android#8 with an older relay: another device's prompt comes from the history at its run's first event and end. */
     @Test
     fun anotherDevicesRunReloadsTheHistory() = runTest {
         store.open("s1")
         store.handle(RelayClient.Output.Message(ServerMessage.Run("run_9", "s1", RunStatus.RUNNING)))
-        assertEquals(2, historyLoads("s1"))
+        assertEquals(1, historyLoads("s1"))
         store.handle(RelayClient.Output.Message(event("s1", 1, EventPayload.ToolStarted("terminal"), run = "run_9")))
         store.handle(RelayClient.Output.Message(event("s1", 2, EventPayload.Answer("Hi."), run = "run_9")))
-        assertEquals(3, historyLoads("s1"))
+        assertEquals(2, historyLoads("s1"))
         store.handle(RelayClient.Output.Message(event("s1", 3, EventPayload.RunCompleted, run = "run_9")))
-        assertEquals(4, historyLoads("s1"))
+        assertEquals(3, historyLoads("s1"))
         assertFalse(session("s1").historyStale)
+    }
+
+    /** trismegistus#30: with user.message the prompt arrives live; only the run's end reloads. */
+    @Test
+    fun userMessageArrivesWithoutAReload() = runTest {
+        store.open("s1")
+        val prompt = EventPayload.UserMessage(EventPayload.UserMessage.Kind.PROMPT, "Draw it", "s21", clientMsgId = "c9")
+        store.handle(RelayClient.Output.Message(ServerMessage.Run("run_9", "s1", RunStatus.RUNNING)))
+        store.handle(RelayClient.Output.Message(event("s1", 1, prompt, run = "run_9")))
+        store.handle(RelayClient.Output.Message(event("s1", 2, EventPayload.ToolStarted("terminal"), run = "run_9")))
+        assertEquals(1, historyLoads("s1"))
+        store.handle(RelayClient.Output.Message(event("s1", 3, EventPayload.RunCompleted, run = "run_9")))
+        assertEquals(2, historyLoads("s1"))
     }
 
     @Test

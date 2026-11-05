@@ -125,16 +125,14 @@ class SessionStateTests {
         assertFalse(s.historyLoaded)
     }
 
-    /** android#8: a run this device didn't start means a prompt only the history has; its first event asks again. */
+    /** android#8 with a relay older than trismegistus#30: another device's run's first event asks for the history. */
     @Test
     fun anotherDevicesRunAsksForTheHistory() {
         var s = SessionState("s1").applyHistory(answeredHistory).feed(ServerMessage.Run("run_9", "s1", RunStatus.RUNNING))
+        assertFalse(s.historyStale) // the prompt may not be stored yet: wait for the run's first event
+        s = s.feed(event("s1", 1, EventPayload.ToolStarted("terminal"), run = "run_9"))
         assertTrue(s.historyStale)
         assertTrue(s.historyLoaded) // the timeline stays on screen while it reloads
-        s = s.applyHistory(answeredHistory)
-        assertFalse(s.historyStale)
-        s = s.feed(event("s1", 1, EventPayload.ToolStarted("terminal"), run = "run_9"))
-        assertTrue(s.historyStale) // Hermes stores the prompt a few ms after the relay announces the run
         s = s.applyHistory(answeredHistory).feed(event("s1", 2, EventPayload.Answer("Hi."), run = "run_9"))
         assertFalse(s.historyStale)
         assertEquals(listOf(1L, 2L), s.events.map { it.seq }) // the running turn's live events stay
@@ -180,5 +178,20 @@ class SessionStateTests {
         assertNull(HistoryMessage.fromJson(Json.parseToJsonElement("""{"id":13,"role":"assistant","display_kind":"hidden","content":""}""")))
         assertEquals("plain [OUT-OF-BAND text", HistoryMessage.unwrapSteer("plain [OUT-OF-BAND text"))
         assertFalse(HistoryMessage.fromJson(Json.parseToJsonElement("""{"id":14,"role":"user","content":"hi"}"""))!!.isSteer)
+    }
+
+    /** trismegistus#30: the relay's user.message is the prompt itself, so no reload; our own steer's replaces its entry. */
+    @Test
+    fun userMessageNeedsNoReloadAndTakesOverOurSteer() {
+        val prompt = EventPayload.UserMessage(EventPayload.UserMessage.Kind.PROMPT, "Draw it", "s21", clientMsgId = "c9")
+        var s = SessionState("s1").applyHistory(answeredHistory)
+            .feed(ServerMessage.Run("run_9", "s1", RunStatus.RUNNING), event("s1", 1, prompt, run = "run_9"), event("s1", 2, EventPayload.ToolStarted("terminal"), run = "run_9"))
+        assertFalse(s.historyStale)
+        assertEquals(ActiveRun("run_9", RunStatus.RUNNING), s.run)
+        s = s.steerSent("st", "run_9", "with the camera")
+        val steer = EventPayload.UserMessage(EventPayload.UserMessage.Kind.STEER, "with the camera", "pixel-8")
+        s = s.feed(event("s1", 3, steer, run = "run_9"))
+        assertTrue(s.outbox.isEmpty())
+        assertEquals(3, s.events.size)
     }
 }

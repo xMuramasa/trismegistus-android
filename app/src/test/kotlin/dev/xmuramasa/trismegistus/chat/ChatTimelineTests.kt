@@ -90,4 +90,24 @@ class ChatTimelineTests {
         )
         assertTrue((stored.single() as ChatItem.User).isSteer)
     }
+
+    /** trismegistus#30: another device's message shows from the relay; this device's own and stored ones don't twice. */
+    @Test
+    fun userMessagesShowOnceWhateverHasThem() {
+        val theirs = EventPayload.UserMessage(EventPayload.UserMessage.Kind.PROMPT, "From the phone", "s21", clientMsgId = "c9")
+        val items = ChatTimeline.items(SessionState("s", events = listOf(event("r9", 1, theirs), event("r9", 2, EventPayload.Answer("Hi.")))))
+        assertEquals(listOf("er9.1", "er9.2"), items.map { it.key })
+        assertEquals(1_000L, (items[0] as ChatItem.User).time)
+        // Our own prompt: the outbox already shows it.
+        val mine = OutgoingPrompt("c9", "From the phone", OutgoingPrompt.Status.Sent("r9"))
+        assertEquals(listOf("pc9", "er9.2"), ChatTimeline.items(SessionState("s", events = listOf(event("r9", 1, theirs), event("r9", 2, EventPayload.Answer("Hi."))), outbox = listOf(mine))).map { it.key })
+        // The history has it (a reload during the run): stamped at or after the event, so it's the same message.
+        val stored = HistoryMessage("7", HistoryMessage.Role.USER, "From the phone", timestamp = 1.05)
+        assertEquals(listOf("h7", "er9.2"), ChatTimeline.items(SessionState("s", history = listOf(stored), events = listOf(event("r9", 1, theirs), event("r9", 2, EventPayload.Answer("Hi."))))).map { it.key })
+        // The same words sent long before are another message.
+        val older = stored.copy(id = "3", timestamp = -60.0)
+        assertEquals(listOf("h3", "er9.1", "er9.2"), ChatTimeline.items(SessionState("s", history = listOf(older), events = listOf(event("r9", 1, theirs), event("r9", 2, EventPayload.Answer("Hi."))))).map { it.key })
+        val steer = EventPayload.UserMessage(EventPayload.UserMessage.Kind.STEER, "faster", "macbook")
+        assertTrue((ChatTimeline.items(SessionState("s", events = listOf(event("r9", 3, steer)))).single() as ChatItem.User).isSteer)
+    }
 }

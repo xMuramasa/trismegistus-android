@@ -59,12 +59,12 @@ public data class SessionState(
     val approvals: List<PendingApproval> = emptyList(),
     val outbox: List<OutgoingPrompt> = emptyList(),
     /**
-     * The history misses something another device sent or a run just finished: the store reloads it, keeping the
-     * timeline on screen meanwhile (unlike [historyLoaded] false). The relay's stream carries no event for a prompt
-     * or a steer, so a run this device didn't start is the only sign of one.
+     * The history misses something: a run just finished, or (with a relay older than trismegistus#30, which sends no
+     * `user.message`) a run this device didn't start began. The store reloads it, keeping the timeline on screen
+     * meanwhile (unlike [historyLoaded] false).
      */
     val historyStale: Boolean = false,
-    /** The run this device didn't start whose first event already asked for a reload (Hermes stores its prompt late). */
+    /** The run this device didn't start whose first event was checked: `user.message`, or else a reload once. */
     val rechecked: String? = null,
 ) {
     public companion object {
@@ -84,11 +84,8 @@ public data class SessionState(
         is ServerMessage.Run -> when {
             message.sessionId != id -> this
             message.status.isTerminal -> end(message.runId)
-            else -> copy(
-                run = ActiveRun(message.runId, message.status),
-                // A run that appears without our ack: another device's prompt, which only the history has.
-                historyStale = historyStale || (run?.id != message.runId && !isOwnRun(message.runId)),
-            )
+            // Another device's prompt arrives as the run's first event (user.message); see recheck().
+            else -> copy(run = ActiveRun(message.runId, message.status))
         }
         is ServerMessage.Ack -> {
             if (outbox.none { it.id == message.clientMsgId }) {
@@ -136,13 +133,24 @@ public data class SessionState(
             is EventPayload.ToolStarted, is EventPayload.ToolCompleted, is EventPayload.SubagentStarted,
             is EventPayload.SubagentCompleted, EventPayload.SteerQueued ->
                 if (run?.id != e.runId) s.copy(run = ActiveRun(e.runId, RunStatus.RUNNING)) else s
+            // Our own steer, back from the relay at its place in the run: the event shows it from now on.
+            is EventPayload.UserMessage -> {
+                val own = if (p.kind == EventPayload.UserMessage.Kind.STEER) {
+                    s.outbox.firstOrNull { it.isSteer && it.text == p.text && (it.status as? OutgoingPrompt.Status.Sent)?.runId == e.runId }
+                } else {
+                    null
+                }
+                val shown = if (own != null) s.copy(outbox = s.outbox - own) else s
+                return (if (run?.id != e.runId) shown.copy(run = ActiveRun(e.runId, RunStatus.RUNNING)) else shown)
+                    .copy(rechecked = if (rechecked == e.runId || isOwnRun(e.runId)) rechecked else e.runId)
+            }
             is EventPayload.Answer, is EventPayload.Reconnected, is EventPayload.Unknown -> s
         }.recheck(e.runId)
     }
 
     /**
-     * The first event of a run this device didn't start asks for the history once more: Hermes stores the prompt a few
-     * ms after the relay announces the run, so the reload the announcement caused may have missed it.
+     * The first event of a run this device didn't start, when it isn't `user.message` (an older relay), asks for the
+     * history: it has the prompt by then (Hermes stores it a few ms after the run starts).
      */
     private fun recheck(runId: String): SessionState =
         if (rechecked == runId || isOwnRun(runId)) this else copy(historyStale = true, rechecked = runId)

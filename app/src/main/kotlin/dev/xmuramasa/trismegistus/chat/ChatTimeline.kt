@@ -74,7 +74,7 @@ object ChatTimeline {
         val steers = state.outbox.filter { it.isSteer }.groupBy { (it.status as? OutgoingPrompt.Status.Sent)?.runId }
         val placed = mutableSetOf<String>()
         fun place(runId: String) {
-            if (placed.add(runId)) items += run(runId, runs[runId].orEmpty(), steers[runId].orEmpty())
+            if (placed.add(runId)) items += run(state, runId, runs[runId].orEmpty(), steers[runId].orEmpty())
         }
         for (p in state.outbox) {
             if (p.isSteer) continue
@@ -112,7 +112,7 @@ object ChatTimeline {
     }
 
     /** Rows sort by seq doubled; a steer sent after seq n sorts at 2n + 1, after that event and before the next. */
-    private fun run(runId: String, events: List<ServerMessage.Event>, steers: List<OutgoingPrompt>): List<ChatItem> {
+    private fun run(state: SessionState, runId: String, events: List<ServerMessage.Event>, steers: List<OutgoingPrompt>): List<ChatItem> {
         val entries = CommandLog.entries(events)
         val rows = mutableListOf<Pair<Long, ChatItem>>()
         fun MutableList<Pair<Long, ChatItem>>.add(seq: Long, item: ChatItem) = add(seq * 2 to item)
@@ -128,6 +128,10 @@ object ChatTimeline {
             val key = "e$runId.${e.seq}"
             when (val p = e.payload) {
                 is EventPayload.Answer -> rows.add(e.seq, ChatItem.Answer(key, p.text, e.ts))
+                is EventPayload.UserMessage -> if (shows(state, e, p)) {
+                    val images = p.attachments.orEmpty().map { ChatImage.Remote(it.id) }
+                    rows.add(e.seq, ChatItem.User(key, p.text, e.ts, images, isSteer = p.kind == EventPayload.UserMessage.Kind.STEER))
+                }
                 is EventPayload.SubagentStarted -> {
                     subagents[p.subagentId] = rows.size
                     rows.add(e.seq, ChatItem.Subagent(key, p.goal ?: "Subagent", null, null))
@@ -150,6 +154,29 @@ object ChatTimeline {
         }
         return rows.sortedBy { it.first }.map { it.second }
     }
+
+    /** How far before a `user.message` the history's copy of it may be stamped (same host clock; Hermes stores later). */
+    private const val HISTORY_SLACK_MS = 10_000L
+
+    /**
+     * A relay's `user.message` (trismegistus#30) shows unless something else already does: this device's outbox
+     * (its prompt by client_msg_id, its steer by run and text) or the history, which has it once Hermes stored it
+     * (same text, or the same images for an image-only prompt, stamped at or after it).
+     */
+    internal fun shows(state: SessionState, e: ServerMessage.Event, p: EventPayload.UserMessage): Boolean {
+        if (p.clientMsgId != null && state.outbox.any { !it.isSteer && it.id == p.clientMsgId }) return false
+        if (state.outbox.any { it.isSteer && it.text == p.text && (it.status as? OutgoingPrompt.Status.Sent)?.runId == e.runId }) return false
+        val text = bare(p.text)
+        val images = p.attachments.orEmpty().map { it.id }
+        return state.history.none { m ->
+            m.role == HistoryMessage.Role.USER && bare(m.content) == text &&
+                (text.isNotEmpty() || m.attachments.map { it.id } == images) &&
+                (m.timestamp ?: 0.0) * 1000 >= e.ts - HISTORY_SLACK_MS
+        }
+    }
+
+    /** Hermes keeps a `[screenshot]` line per image in the prompt it stores. */
+    private fun bare(text: String): String = text.lines().filter { it.trim() != "[screenshot]" }.joinToString("\n").trim()
 
     /** A tool call's main argument: `command`, `path`, `query` or the first string; else the raw text, cut. */
     internal fun argumentSummary(arguments: String?): String? {

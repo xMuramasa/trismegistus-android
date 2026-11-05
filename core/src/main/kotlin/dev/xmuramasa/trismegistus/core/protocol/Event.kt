@@ -1,5 +1,6 @@
 package dev.xmuramasa.trismegistus.core.protocol
 
+import dev.xmuramasa.trismegistus.core.relay.AttachmentRef
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -83,6 +84,25 @@ public sealed interface EventPayload {
     /** The `unknown` kind: a Hermes event the relay doesn't map, its frame kept raw in [data]; safe to ignore. */
     @Serializable
     public data class Unknown(val event: String, val data: JsonObject, val truncated: Boolean? = null) : EventPayload
+
+    /**
+     * A user's message as the relay accepted it (trismegistus#30), so every device shows it at once: a prompt (its
+     * run's first event; [clientMsgId] is the prompt's) or a steer (right before `steer.queued`). [device] sent it.
+     */
+    @Serializable
+    public data class UserMessage(
+        val kind: Kind,
+        val text: String,
+        val device: String,
+        @SerialName("client_msg_id") val clientMsgId: String? = null,
+        val attachments: List<AttachmentRef>? = null,
+    ) : EventPayload {
+        @Serializable
+        public enum class Kind {
+            @SerialName("prompt") PROMPT,
+            @SerialName("steer") STEER,
+        }
+    }
 }
 
 public val EventPayload.kind: String
@@ -100,6 +120,7 @@ public val EventPayload.kind: String
         EventPayload.SteerQueued -> "steer.queued"
         is EventPayload.Reconnected -> "reconnected"
         is EventPayload.Unknown -> "unknown"
+        is EventPayload.UserMessage -> "user.message"
     }
 
 /** Ends the run it belongs to. */
@@ -147,6 +168,7 @@ internal object EventSerializer : KSerializer<ServerMessage.Event> {
         "steer.queued" -> json.decodeFromJsonElement(EventPayload.SteerQueued.serializer(), data)
         "reconnected" -> json.decodeFromJsonElement(EventPayload.Reconnected.serializer(), data)
         "unknown" -> json.decodeFromJsonElement(EventPayload.Unknown.serializer(), data)
+        "user.message" -> json.decodeFromJsonElement(EventPayload.UserMessage.serializer(), data)
         // schema.json's event_kind is a closed enum: anything new arrives as kind `unknown`.
         else -> throw SerializationException("unknown event kind")
     }
@@ -165,5 +187,6 @@ internal object EventSerializer : KSerializer<ServerMessage.Event> {
         EventPayload.SteerQueued -> json.encodeToJsonElement(EventPayload.SteerQueued.serializer(), EventPayload.SteerQueued)
         is EventPayload.Reconnected -> json.encodeToJsonElement(EventPayload.Reconnected.serializer(), p)
         is EventPayload.Unknown -> json.encodeToJsonElement(EventPayload.Unknown.serializer(), p)
+        is EventPayload.UserMessage -> json.encodeToJsonElement(EventPayload.UserMessage.serializer(), p)
     }
 }
