@@ -46,6 +46,9 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 export ANDROID_HOME="$HOME/Library/Android/sdk" PATH="$HOME/Library/Android/sdk/platform-tools:$HOME/.maestro/bin:$PATH"
 cd "$HOME/$remote"
 adb -s "$serial" install -r trismegistus.apk < /dev/null | tail -1
+# A picture in the gallery for the image flows (idempotent).
+adb -s "$serial" push qa/assets/sample.png /sdcard/Pictures/qa-sample.png < /dev/null > /dev/null
+adb -s "$serial" shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Pictures/qa-sample.png < /dev/null > /dev/null
 run="runs/$stamp"; mkdir -p "$run"; cd "$run"
 args=(); for f in "$@"; do args+=("$HOME/$remote/$f"); done
 maestro --device "$serial" test -e RUN="$stamp" --format junit --output report.xml --test-output-dir output "${args[@]}" \

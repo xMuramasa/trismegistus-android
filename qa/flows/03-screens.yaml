@@ -1,0 +1,51 @@
+# Screens for design checks (no assertions beyond getting there): the QA conversation idle, during a run (WORKING,
+# Stop and Steer), its transcript sheet, and the message box with an image in the tray. Costs one short Hermes reply.
+# Needs an image in the emulator's gallery (scripts/qa.sh pushes qa/assets/sample.png).
+appId: dev.xmuramasa.trismegistus
+name: screens
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "APP // [1-9].*"
+    timeout: 30000
+- tapOn: "Filter"
+- inputText: "QA"
+- hideKeyboard
+- tapOn:
+    text: "QA"
+    index: 1
+- extendedWaitUntil:
+    visible: "Message Hermes"
+    timeout: 20000
+- takeScreenshot: 20-conversation
+- tapOn: "Message Hermes"
+- inputText: "QA ${RUN}: run the terminal command sleep 30, then answer OK."
+- hideKeyboard
+- tapOn: "Send"
+# The chat must follow what you send (android#12: it stayed at the old scroll position, the new message below the fold).
+- assertVisible: "QA ${RUN}: run the terminal command sleep 30, then answer OK."
+- extendedWaitUntil:
+    visible: "transcript"
+    timeout: 60000
+- takeScreenshot: 21-run
+- tapOn: "transcript"
+- waitForAnimationToEnd
+- takeScreenshot: 22-transcript-sheet
+- back
+- extendedWaitUntil:
+    visible: "Message Hermes"
+    timeout: 240000
+- tapOn: "Attach images"
+# Android's photo picker: thumbnails are "Photo taken on ...", then Done.
+- extendedWaitUntil:
+    visible: "Photo taken on.*"
+    timeout: 15000
+- tapOn:
+    text: "Photo taken on.*"
+    index: 0
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible: "Remove image"
+    timeout: 15000
+- takeScreenshot: 23-tray
+- tapOn: "Remove image"
