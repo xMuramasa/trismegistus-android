@@ -27,7 +27,7 @@ State outside the repo, in `~/.local/share/trismegistus-android/`:
 ## Protocol
 
 `protocol/` is a copy of the relay repo's `protocol/` (schema and examples). `scripts/sync-protocol.sh` refreshes it
-from `~/Projects/trismegistus/protocol` and writes `protocol/SOURCE` (`scripts/protocol-hash.sh`); a contract test
+from `~/Projects/hermes-relay/protocol` and writes `protocol/SOURCE` (`scripts/protocol-hash.sh`); a contract test
 fails while the copy is stale.
 
 ## Design
