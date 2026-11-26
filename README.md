@@ -1,12 +1,44 @@
 # trismegistus-android
 
-A native Android companion for [Hermes Agent](https://hermes-agent.nousresearch.com): chat with Hermes on the home
-server, follow its tool calls live, answer approval requests, from the phone. It talks to the Trismegistus relay
-([xMuramasa/trismegistus](https://github.com/xMuramasa/trismegistus)) like the macOS app
-([xMuramasa/trismegistus-mac](https://github.com/xMuramasa/trismegistus-mac)), and its usability follows that app.
-Kotlin and Jetpack Compose. What it does and why: [SPEC.md](SPEC.md).
+[![CI](https://github.com/xMuramasa/trismegistus-android/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/xMuramasa/trismegistus-android/actions/workflows/ci.yml)
+![Kotlin 2.4](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
+![Jetpack Compose](https://img.shields.io/badge/Jetpack_Compose-4285F4?logo=jetpackcompose&logoColor=white)
+![Android 12+](https://img.shields.io/badge/Android-12%2B-3DDC84?logo=android&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Status: bootstrapped (build environment, Gradle wrapper, protocol copy, release key). Design and code are next.
+A native Android companion for [Hermes Agent](https://hermes-agent.nousresearch.com): chat with Hermes on the home
+server, follow its tool calls live and answer approval requests, from the phone. It talks to the relay in
+[hermes-relay](https://github.com/xMuramasa/hermes-relay), the same way the macOS app
+([trismegistus-mac](https://github.com/xMuramasa/trismegistus-mac)) does, and its usability follows that app. Kotlin
+and Jetpack Compose. What it does and why: [SPEC.md](SPEC.md).
+
+<p align="center">
+  <img src="design/review-2026-11-05/today/today-02-list.png" alt="Conversation list with kind tabs, pinned conversations and a filter" width="24%" />
+  <img src="design/review-2026-11-05/today/today-05-run.png" alt="A run in progress: steer, stop and the live command marker" width="24%" />
+  <img src="design/review-2026-11-05/today/today-06-transcript.png" alt="The command transcript of a run" width="24%" />
+  <img src="design/review-2026-11-05/today/today-08-settings.png" alt="Settings: the relay connection, notification switches and unpair" width="24%" />
+</p>
+<p align="center"><sub>Screens from the automated QA run on a headless emulator (0.1.x, 2026-11-05), in a conversation kept for app tests.</sub></p>
+
+## Highlights
+
+- **Pairing without typing secrets.** Scan the relay's QR code (the camera is asked for only then) or paste the code.
+  The device token is sealed with an Android Keystore AES-GCM key and never backed up.
+- **Live runs.** Tool progress as it happens, steer or stop a running turn, and a transcript of every command a run
+  executed.
+- **Approvals.** Once, This session or Deny, right in the conversation.
+- **Images.** Up to four per message from the photo picker, the camera or the share sheet, made upright, resized to
+  2048 px and re-encoded without EXIF (no location).
+- **Works offline.** The last list and conversations stay readable while the relay is out of reach; the app
+  reconnects with backoff and resubscribes from the last event it saw.
+- **One design system.** Colours, spacing, type and icons are generated from the same design tokens as the Mac app
+  (`scripts/gen-tokens.py`), and `scripts/check-tokens.sh` (run in CI) fails on any raw colour or size outside the
+  theme.
+- **Tested.** JVM unit tests for the protocol client and the screens' logic, contract tests against the relay's
+  protocol examples, lint, and Maestro UI flows on an emulator.
+
+Status: 0.1.2, installed on a Galaxy S21 and checked by the Maestro flows on an emulator. Next: notifications through
+ntfy / UnifiedPush and the GitHub, News, Agents, Jobs and Commands sections.
 
 ## Build
 

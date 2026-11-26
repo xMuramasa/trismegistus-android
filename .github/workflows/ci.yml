@@ -1,0 +1,36 @@
+name: CI
+
+# The [gates] of .caduceus/project.toml: design tokens, then unit tests, lint and the debug APK in the build
+# container. The release APK needs the signing key, which only lives on the build host.
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Design tokens
+        run: scripts/check-tokens.sh
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.local/share/trismegistus-android/gradle
+          key: gradle-${{ hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties', '**/*.gradle.kts') }}
+          restore-keys: gradle-
+
+      - name: Unit tests, lint and the debug APK
+        env:
+          TRISMEGISTUS_ANDROID_BUILD_MEMORY: 6g
+        run: scripts/build.sh test lintDebug assembleDebug
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
