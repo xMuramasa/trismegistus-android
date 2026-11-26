@@ -1,0 +1,55 @@
+# Caduceus settings (caduceus SPEC section 6), written by Hermes (no hermes-dispatch profile existed).
+kind = "android-app"
+language = "kotlin"
+model = "opus"
+hosts = ["optiplex"]
+locks = ["gradle"]
+rules = [
+  "Build and test only with `scripts/build.sh` (no arguments for the full run; Gradle task names to run fewer, e.g. `scripts/build.sh testDebugUnitTest`) and `scripts/check-tokens.sh`. One Gradle build at a time (memory).",
+  "The protocol files under `protocol/` come from hermes-relay through `scripts/sync-protocol.sh` (Hermes' step); never edit them by hand. Contract tests read them.",
+  "Design tokens come from `design/` through `scripts/gen-tokens.py`; views use the generated tokens, never raw colours or dp/sp literals (check-tokens).",
+  "The build reads the release signing key inside the container; Gradle code may load it, never log it. Tests never touch the real relay, the network or a device.",
+]
+network = "No direct network: no WebFetch, WebSearch, curl or wget. Dependencies come from Google's Maven and Maven Central through the version catalog, fetched by the build; add only what the issue allows and list each one with its version in the report."
+
+[gates]
+# One Gradle run in the build container: unit tests, lint and both APKs.
+test = [
+  "scripts/build.sh",
+]
+lint = [
+  "scripts/check-tokens.sh",
+]
+
+[access]
+allow = [
+  "Bash(python3*)",
+  "Bash(scripts/build.sh*)",
+  "Bash(./scripts/build.sh*)",
+  "Bash(scripts/check-tokens.sh*)",
+  "Bash(./scripts/check-tokens.sh*)",
+  "Bash(unzip -l*)",
+  "Bash(du*)",
+]
+deny = [
+  "Bash(adb*)",
+  "Bash(scripts/publish.sh*)",
+  "Bash(./scripts/publish.sh*)",
+  "Bash(scripts/qa.sh*)",
+  "Bash(./scripts/qa.sh*)",
+  "Bash(scripts/sync-protocol.sh*)",
+  "Bash(./scripts/sync-protocol.sh*)",
+]
+protected = [
+  "scripts/**",
+  "docker/**",
+  "gradle/wrapper/**",
+  "gradlew*",
+  "protocol/**",
+]
+read_only = [
+  "hermes-relay",
+]
+secret = [
+  "~/.local/share/trismegistus-android/signing/**",
+]
